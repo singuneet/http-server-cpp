@@ -59,13 +59,20 @@ void handle_client(int client_fd) {
   size_t end = request.find(" ", start);
   std::string path = request.substr(start, end - start);
   
+  bool accepts_gzip = request.find("Accept-Encoding: gzip") != std::string::npos;
+  
   std::string response;
   if (request.find("GET") == 0) {
     if (path == "/") {
       response = "HTTP/1.1 200 OK\r\n\r\n";
     } else if (path.rfind("/echo/", 0) == 0) {
       std::string echo_content = path.substr(6);
-      response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + std::to_string(echo_content.length()) + "\r\n\r\n" + echo_content;
+      if (accepts_gzip) {
+        std::string compressed_content = gzip_compress(echo_content);
+        response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: " + std::to_string(compressed_content.length()) + "\r\n\r\n" + compressed_content;
+      } else {
+        response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + std::to_string(echo_content.length()) + "\r\n\r\n" + echo_content;
+      }
     } else if (path.rfind("/files/", 0) == 0) {
       std::string filename = directory + path.substr(7);
       std::ifstream file(filename, std::ios::binary);
