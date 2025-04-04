@@ -92,7 +92,7 @@ void handle_client(int client_fd) {
         std::ostringstream content;
         content << file.rdbuf();
         std::string file_data = content.str();
-        response = "HTTP/1.1 200 OK\r\nContent-Length: " + std::to_string(file_data.size()) + "\r\n\r\n" + file_data;
+        response = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: " + std::to_string(file_data.size()) + "\r\n\r\n" + file_data;
       }
     } else {
       response = "HTTP/1.1 404 Not Found\r\n\r\n";
