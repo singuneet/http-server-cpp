@@ -100,7 +100,7 @@ void handle_client(int client_fd) {
     if (file) {
       file.write(buffer + request.find("\r\n\r\n") + 4, bytes_read - request.find("\r\n\r\n") - 4);
       file.close();
-      response = "HTTP/1.1 201 Created\r\n\r\n";
+      response = "HTTP/1.1 200 OK\r\n\r\n"; // Changed from 201 to 200
     } else {
       response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
     }
