@@ -79,12 +79,22 @@ int main(int argc, char **argv) {
   
   std::string response;
   if (path == "/") {
-    response = "HTTP/1.1 200 OK\r\n\r\n";  
-  } else if (path.rfind("/echo/", 0) == 0) { // New feature: Echo endpoint handling
+    response = "HTTP/1.1 200 OK\r\n\r\n";
+  } else if (path.rfind("/echo/", 0) == 0) {
     std::string echo_content = path.substr(6);
     response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + std::to_string(echo_content.length()) + "\r\n\r\n" + echo_content;
+  } else if (path == "/user-agent") { // New feature: User-Agent handling
+    size_t ua_start = request.find("User-Agent: ");
+    if (ua_start != std::string::npos) {
+      ua_start += 12; // Move past "User-Agent: "
+      size_t ua_end = request.find("\r\n", ua_start);
+      std::string user_agent = request.substr(ua_start, ua_end - ua_start);
+      response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + std::to_string(user_agent.length()) + "\r\n\r\n" + user_agent;
+    } else {
+      response = "HTTP/1.1 400 Bad Request\r\n\r\n";
+    }
   } else {
-    response = "HTTP/1.1 404 Not Found\r\n\r\n";  
+    response = "HTTP/1.1 404 Not Found\r\n\r\n";
   }
 
   send(client_fd, response.c_str(), response.length(), 0);
