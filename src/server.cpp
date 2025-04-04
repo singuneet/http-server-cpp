@@ -97,12 +97,18 @@ void handle_client(int client_fd) {
   } else if (path.rfind("/files/", 0) == 0) {
     std::string filename = directory + path.substr(7);
     std::ofstream file(filename, std::ios::binary);
-    if (file) {
-      file.write(buffer + request.find("\r\n\r\n") + 4, bytes_read - request.find("\r\n\r\n") - 4);
-      file.close();
-      response = "HTTP/1.1 200 OK\r\n\r\n"; // Changed 201 Created to 200 OK
-    } else {
+    if (!file) {
       response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
+    } else {
+      size_t body_start = request.find("\r\n\r\n");
+      if (body_start != std::string::npos) {
+        body_start += 4;
+        file.write(buffer + body_start, bytes_read - body_start);
+        file.close();
+        response = "HTTP/1.1 201 Created\r\n\r\n";
+      } else {
+        response = "HTTP/1.1 400 Bad Request\r\n\r\n";
+      }
     }
     send(client_fd, response.c_str(), response.length(), 0);
   } else {
