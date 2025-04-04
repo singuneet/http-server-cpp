@@ -53,6 +53,14 @@ bool client_accepts_gzip(const std::string& request) {
     return encoding_line.find("gzip") != std::string::npos;
 }
 
+std::string extract_header_value(const std::string& request, const std::string& header) {
+    size_t pos = request.find(header + ": ");
+    if (pos == std::string::npos) return "";
+    size_t start = pos + header.length() + 2;
+    size_t end = request.find("\r\n", start);
+    return request.substr(start, end - start);
+}
+
 void handle_client(int client_fd) {
   char buffer[4096] = {0};
   int bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
@@ -83,6 +91,9 @@ void handle_client(int client_fd) {
       } else {
         response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + std::to_string(echo_content.length()) + "\r\n\r\n" + echo_content;
       }
+    } else if (path == "/user-agent") {
+      std::string user_agent = extract_header_value(request, "User-Agent");
+      response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + std::to_string(user_agent.length()) + "\r\n\r\n" + user_agent;
     } else if (path.rfind("/files/", 0) == 0) {
       std::string filename = directory + path.substr(7);
       std::ifstream file(filename, std::ios::binary);
@@ -96,21 +107,6 @@ void handle_client(int client_fd) {
       }
     } else {
       response = "HTTP/1.1 404 Not Found\r\n\r\n";
-    }
-  } else if (request.find("POST") == 0 && path.rfind("/files/", 0) == 0) {
-    std::string filename = directory + path.substr(7);
-    size_t body_start = request.find("\r\n\r\n");
-    if (body_start != std::string::npos) {
-      body_start += 4;
-      std::ofstream file(filename, std::ios::binary);
-      if (file) {
-        file.write(request.data() + body_start, request.size() - body_start);
-        response = "HTTP/1.1 201 Created\r\n\r\n";
-      } else {
-        response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
-      }
-    } else {
-      response = "HTTP/1.1 400 Bad Request\r\n\r\n";
     }
   } else {
     response = "HTTP/1.1 405 Method Not Allowed\r\n\r\n";
