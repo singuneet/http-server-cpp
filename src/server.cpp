@@ -44,7 +44,7 @@ std::string gzip_compress(const std::string& data) {
 }
 
 void handle_client(int client_fd) {
-  char buffer[1024] = {0};
+  char buffer[4096] = {0};
   int bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
   if (bytes_read <= 0) {
     std::cerr << "Failed to read request" << std::endl;
@@ -60,56 +60,45 @@ void handle_client(int client_fd) {
   std::string path = request.substr(start, end - start);
   
   std::string response;
-  if (path == "/") {
-    response = "HTTP/1.1 200 OK\r\n\r\n";
-  } else if (path.rfind("/echo/", 0) == 0) {
-    std::string echo_content = path.substr(6);
-    std::string headers = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n";
-    
-    size_t enc_start = request.find("Accept-Encoding:");
-    bool gzip_supported = false;
-    if (enc_start != std::string::npos) {
-      size_t enc_end = request.find("\r\n", enc_start);
-      std::string encodings = request.substr(enc_start + 16, enc_end - enc_start - 16);
-      if (encodings.find("gzip") != std::string::npos) {
-        gzip_supported = true;
-      }
-    }
-    
-    if (gzip_supported) {
-      std::string compressed = gzip_compress(echo_content);
-      if (!compressed.empty()) {
-        headers += "Content-Encoding: gzip\r\nContent-Length: " + std::to_string(compressed.length()) + "\r\n\r\n";
-        send(client_fd, headers.c_str(), headers.size(), 0);
-        send(client_fd, compressed.data(), compressed.size(), 0);
-        std::cout << "Sent gzip-compressed response" << std::endl;
+  if (request.find("GET") == 0) {
+    if (path == "/") {
+      response = "HTTP/1.1 200 OK\r\n\r\n";
+    } else if (path.rfind("/echo/", 0) == 0) {
+      std::string echo_content = path.substr(6);
+      response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + std::to_string(echo_content.length()) + "\r\n\r\n" + echo_content;
+    } else if (path.rfind("/files/", 0) == 0) {
+      std::string filename = directory + path.substr(7);
+      std::ifstream file(filename, std::ios::binary);
+      if (!file) {
+        response = "HTTP/1.1 404 Not Found\r\n\r\n";
       } else {
-        std::cerr << "Gzip compression failed, falling back to plain text" << std::endl;
-        headers += "Content-Length: " + std::to_string(echo_content.length()) + "\r\n\r\n";
-        response = headers + echo_content;
-        send(client_fd, response.c_str(), response.length(), 0);
+        std::ostringstream content;
+        content << file.rdbuf();
+        std::string file_data = content.str();
+        response = "HTTP/1.1 200 OK\r\nContent-Length: " + std::to_string(file_data.size()) + "\r\n\r\n" + file_data;
       }
     } else {
-      headers += "Content-Length: " + std::to_string(echo_content.length()) + "\r\n\r\n";
-      response = headers + echo_content;
-      send(client_fd, response.c_str(), response.length(), 0);
-    }
-  } else if (path.rfind("/files/", 0) == 0) {
-    std::string filename = directory + path.substr(7);
-    std::ifstream file(filename, std::ios::binary);
-    if (!file) {
       response = "HTTP/1.1 404 Not Found\r\n\r\n";
-    } else {
-      std::ostringstream content;
-      content << file.rdbuf();
-      std::string file_data = content.str();
-      response = "HTTP/1.1 200 OK\r\nContent-Length: " + std::to_string(file_data.size()) + "\r\n\r\n" + file_data;
     }
-    send(client_fd, response.c_str(), response.length(), 0);
+  } else if (request.find("POST") == 0 && path.rfind("/files/", 0) == 0) {
+    std::string filename = directory + path.substr(7);
+    size_t body_start = request.find("\r\n\r\n");
+    if (body_start != std::string::npos) {
+      body_start += 4;
+      std::ofstream file(filename, std::ios::binary);
+      if (file) {
+        file.write(request.data() + body_start, request.size() - body_start);
+        response = "HTTP/1.1 201 Created\r\n\r\n";
+      } else {
+        response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
+      }
+    } else {
+      response = "HTTP/1.1 400 Bad Request\r\n\r\n";
+    }
   } else {
-    response = "HTTP/1.1 404 Not Found\r\n\r\n";
-    send(client_fd, response.c_str(), response.length(), 0);
+    response = "HTTP/1.1 405 Method Not Allowed\r\n\r\n";
   }
+  send(client_fd, response.c_str(), response.length(), 0);
   close(client_fd);
 }
 
