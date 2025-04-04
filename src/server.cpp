@@ -22,7 +22,7 @@ std::string gzip_compress(const std::string& data) {
         return "";
     }
     
-    zs.next_in = (Bytef*)data.data();
+    zs.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
     zs.avail_in = data.size();
     
     int ret;
@@ -33,10 +33,10 @@ std::string gzip_compress(const std::string& data) {
         zs.next_out = reinterpret_cast<Bytef*>(outbuffer);
         zs.avail_out = sizeof(outbuffer);
         ret = deflate(&zs, Z_FINISH);
-        if (outstring.size() < zs.total_out) {
-            outstring.append(outbuffer, zs.total_out - outstring.size());
+        if (ret != Z_STREAM_ERROR) {
+            outstring.append(outbuffer, sizeof(outbuffer) - zs.avail_out);
         }
-    } while (ret == Z_OK);
+    } while (zs.avail_out == 0);
     
     deflateEnd(&zs);
     return (ret == Z_STREAM_END) ? outstring : "";
@@ -76,10 +76,12 @@ void handle_client(int client_fd) {
     if (gzip_supported) {
       std::string compressed = gzip_compress(echo_content);
       headers += "Content-Encoding: gzip\r\nContent-Length: " + std::to_string(compressed.length()) + "\r\n\r\n";
-      response = headers + compressed;
+      send(client_fd, headers.c_str(), headers.size(), 0);
+      send(client_fd, compressed.data(), compressed.size(), 0);
     } else {
       headers += "Content-Length: " + std::to_string(echo_content.length()) + "\r\n\r\n";
       response = headers + echo_content;
+      send(client_fd, response.c_str(), response.length(), 0);
     }
   } else if (path == "/user-agent") {
     size_t ua_start = request.find("User-Agent: ");
@@ -91,6 +93,7 @@ void handle_client(int client_fd) {
     } else {
       response = "HTTP/1.1 400 Bad Request\r\n\r\n";
     }
+    send(client_fd, response.c_str(), response.length(), 0);
   } else if (path.rfind("/files/", 0) == 0) {
     std::string filename = path.substr(7);
     if (request.rfind("POST", 0) == 0) {
@@ -119,11 +122,11 @@ void handle_client(int client_fd) {
         response = "HTTP/1.1 404 Not Found\r\n\r\n";
       }
     }
+    send(client_fd, response.c_str(), response.length(), 0);
   } else {
     response = "HTTP/1.1 404 Not Found\r\n\r\n";
+    send(client_fd, response.c_str(), response.length(), 0);
   }
-
-  send(client_fd, response.c_str(), response.length(), 0);
   close(client_fd);
 }
 
