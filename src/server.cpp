@@ -33,8 +33,14 @@ void handle_client(int client_fd) {
     std::string echo_content = path.substr(6);
     std::string headers = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + std::to_string(echo_content.length()) + "\r\n";
     
-    if (request.find("Accept-Encoding: gzip") != std::string::npos) { // CHANGED: Added gzip header support
-      headers += "Content-Encoding: gzip\r\n";
+    // CHANGED: Improved parsing of Accept-Encoding to handle multiple encodings
+    size_t enc_start = request.find("Accept-Encoding:");
+    if (enc_start != std::string::npos) {
+      size_t enc_end = request.find("\r\n", enc_start);
+      std::string encodings = request.substr(enc_start + 16, enc_end - enc_start - 16);
+      if (encodings.find("gzip") != std::string::npos) {
+        headers += "Content-Encoding: gzip\r\n";
+      }
     }
     
     response = headers + "\r\n" + echo_content;
