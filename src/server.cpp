@@ -112,6 +112,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  int opt = 1;
+  setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
   struct sockaddr_in server_addr = {AF_INET, htons(4221), INADDR_ANY};
   if (bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) != 0) {
     std::cerr << "Bind failed" << std::endl;
