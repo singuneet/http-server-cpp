@@ -8,6 +8,9 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <thread>
+#include <fstream>
+
+std::string directory;
 
 void handle_client(int client_fd) {
   char buffer[1024] = {0};
@@ -39,6 +42,18 @@ void handle_client(int client_fd) {
     } else {
       response = "HTTP/1.1 400 Bad Request\r\n\r\n";
     }
+  } else if (path.rfind("/files/", 0) == 0) { // CHANGED: Added support for serving files
+    std::string filename = path.substr(7);
+    std::ifstream file(directory + "/" + filename, std::ios::binary | std::ios::ate);
+    if (file) {
+      std::streamsize size = file.tellg();
+      file.seekg(0, std::ios::beg);
+      std::string content(size, '\0');
+      file.read(&content[0], size);
+      response = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: " + std::to_string(size) + "\r\n\r\n" + content;
+    } else {
+      response = "HTTP/1.1 404 Not Found\r\n\r\n";
+    }
   } else {
     response = "HTTP/1.1 404 Not Found\r\n\r\n";
   }
@@ -54,6 +69,10 @@ int main(int argc, char **argv) {
   std::cerr << std::unitbuf;
   
   std::cout << "Logs from your program will appear here!\n";
+
+  if (argc == 3 && std::string(argv[1]) == "--directory") {
+    directory = argv[2]; // CHANGED: Store directory argument
+  }
 
   int server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0) {
