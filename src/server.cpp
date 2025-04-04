@@ -53,10 +53,42 @@ int main(int argc, char **argv) {
 
   std::cout << "Waiting for a client to connect...\n";
 
-  int client=accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
-  std::string message = "HTTP/1.1 200 OK\r\n\r\n";
-  send(client, message.c_str(), message.length(), 0);
+  int client_fd=accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
+  if (client_fd<0){
+    std::cerr<<"Client connection failed\n";
+    return 1;
+  }
   std::cout << "Client connected\n";
+
+  char buffer[1024]={0};
+  int bytes_read=read(client_fd, buffer, sizeof(buffer)-1);
+  if (bytes_read <= 0) {
+    std::cerr << "Failed to read request\n";  // CHANGED: Added error handling for read failures
+    close(client_fd);
+    close(server_fd);
+    return 1;
+  }
+
+  std::string request(buffer);
+  
+  // Extract the path from the request line
+  size_t start = request.find(" ") + 1;  // CHANGED: Extract path correctly from request
+  size_t end = request.find(" ", start);
+  std::string path = request.substr(start, end - start);  // CHANGED: Extract only the path
+
+  // Determine response
+  std::string response;
+  if (path == "/") {
+    response = "HTTP/1.1 200 OK\r\n\r\n";  // CHANGED: Handle root path correctly
+  } else {
+    response = "HTTP/1.1 404 Not Found\r\n\r\n";  // CHANGED: Return 404 for other paths
+  }
+
+  send(client_fd, response.c_str(), response.length(), 0);
+  
+  std::cout << "Response sent: " << response;  // CHANGED: Print actual response sent
+
+  close(client_fd);
 
   close(server_fd);
 
