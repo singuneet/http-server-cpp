@@ -31,7 +31,13 @@ void handle_client(int client_fd) {
     response = "HTTP/1.1 200 OK\r\n\r\n";
   } else if (path.rfind("/echo/", 0) == 0) {
     std::string echo_content = path.substr(6);
-    response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + std::to_string(echo_content.length()) + "\r\n\r\n" + echo_content;
+    std::string headers = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + std::to_string(echo_content.length()) + "\r\n";
+    
+    if (request.find("Accept-Encoding: gzip") != std::string::npos) { // CHANGED: Added gzip header support
+      headers += "Content-Encoding: gzip\r\n";
+    }
+    
+    response = headers + "\r\n" + echo_content;
   } else if (path == "/user-agent") {
     size_t ua_start = request.find("User-Agent: ");
     if (ua_start != std::string::npos) {
