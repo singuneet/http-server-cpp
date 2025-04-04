@@ -43,6 +43,16 @@ std::string gzip_compress(const std::string& data) {
     return (ret == Z_STREAM_END) ? outstring : "";
 }
 
+bool client_accepts_gzip(const std::string& request) {
+    size_t pos = request.find("Accept-Encoding:");
+    if (pos == std::string::npos) return false;
+    
+    size_t end = request.find("\r\n", pos);
+    std::string encoding_line = request.substr(pos, end - pos);
+    
+    return encoding_line.find("gzip") != std::string::npos;
+}
+
 void handle_client(int client_fd) {
   char buffer[4096] = {0};
   int bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
@@ -59,7 +69,7 @@ void handle_client(int client_fd) {
   size_t end = request.find(" ", start);
   std::string path = request.substr(start, end - start);
   
-  bool accepts_gzip = request.find("Accept-Encoding: gzip") != std::string::npos;
+  bool accepts_gzip = client_accepts_gzip(request);
   
   std::string response;
   if (request.find("GET") == 0) {
