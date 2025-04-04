@@ -94,6 +94,17 @@ void handle_client(int client_fd) {
       response = headers + echo_content;
       send(client_fd, response.c_str(), response.length(), 0);
     }
+  } else if (path.rfind("/files/", 0) == 0) {
+    std::string filename = directory + path.substr(7);
+    std::ofstream file(filename, std::ios::binary);
+    if (file) {
+      file.write(buffer + request.find("\r\n\r\n") + 4, bytes_read - request.find("\r\n\r\n") - 4);
+      file.close();
+      response = "HTTP/1.1 201 Created\r\n\r\n";
+    } else {
+      response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
+    }
+    send(client_fd, response.c_str(), response.length(), 0);
   } else {
     response = "HTTP/1.1 404 Not Found\r\n\r\n";
     send(client_fd, response.c_str(), response.length(), 0);
